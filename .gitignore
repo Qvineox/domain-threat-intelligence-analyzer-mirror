@@ -2,4 +2,5 @@
 /data
 .idea
 go.sum
-/scripts/dnsScrapper/input/
+input/
+output/

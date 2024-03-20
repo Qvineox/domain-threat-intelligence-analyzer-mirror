@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"github.com/ammario/ipisp"
 	"github.com/miekg/dns"
+	"github.com/shlin168/go-whois/whois"
 	"log/slog"
+	"math/rand"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +26,7 @@ var dnsClient ipisp.Client
 
 func main() {
 	resolver := prepareResolver("8.8.8.8:53")
+	//prepareWhoisClient()
 
 	inputFile, err := os.Open("input/input_dns.csv")
 	if err != nil {
@@ -57,6 +61,8 @@ func main() {
 	_, _ = csvReader.Read() // skip header
 	var index = 0
 
+	var recordsBuffer []record
+
 	for {
 		index++
 
@@ -67,8 +73,11 @@ func main() {
 		}
 
 		r := record{
-			cidr: l[0],
-			name: l[3],
+			cidr:             l[0],
+			name:             l[3],
+			asnCount:         -1,
+			regionCount:      -1,
+			allocationMonths: -1,
 		}
 
 		_, ok := resolved[r.name]
@@ -97,16 +106,21 @@ func main() {
 		r.ips, _ = resolver.LookupIP(context.Background(), "ip", r.name)
 
 		// query whois data
-		r.asnCount, r.regionCount, r.allocationMonths, r.registryCount, err = queryWhoIS(r.ips)
-		if err != nil {
-			slog.Error(err.Error())
-		}
+		//r.asnCount, r.regionCount, r.allocationMonths, r.registryCount, err = queryWhoIS(r.ips)
+		//if err != nil {
+		//	slog.Error(err.Error())
+		//}
+
+		//queryWhoISDomain(r.name)
 
 		mxs, _ := resolver.LookupMX(context.Background(), r.name)
 		r.mxCount = len(mxs)
 
 		cNames, _ := resolver.LookupCNAME(context.Background(), r.name)
 		r.cnameCount = len(cNames)
+
+		txts, _ := resolver.LookupTXT(context.Background(), r.name)
+		r.txtCount = len(txts)
 
 		var matchedPtrRecords = 0
 
@@ -132,14 +146,50 @@ func main() {
 			r.ptrRatio = -1
 		}
 
-		err = csvWriter.Write(r.toCSV())
-		if err != nil {
-			slog.Error(err.Error())
+		recordsBuffer = append(recordsBuffer, r)
+		if len(recordsBuffer) >= 1000 {
+			slog.Info("starting whois query for next 100 records...")
+
+			var recordsToWrite []record
+
+			recordsToWrite, err = queryRecords(recordsBuffer)
+			if err != nil {
+				slog.Error(err.Error())
+				recordsToWrite = recordsBuffer
+			}
+
+			for _, rec := range recordsToWrite {
+				err = csvWriter.Write(rec.toCSV())
+				if err != nil {
+					slog.Warn(err.Error())
+				}
+			}
+
+			csvWriter.Flush()
+			recordsBuffer = []record{}
 		}
 
-		csvWriter.Flush()
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep((100 + time.Duration(rand.Int63n(500))) * time.Millisecond)
 	}
+
+	if len(recordsBuffer) > 0 {
+		var recordsToWrite []record
+
+		recordsToWrite, err = queryRecords(recordsBuffer)
+		if err != nil {
+			slog.Error(err.Error())
+			recordsToWrite = recordsBuffer
+		}
+
+		for _, rec := range recordsToWrite {
+			err = csvWriter.Write(rec.toCSV())
+			if err != nil {
+				slog.Warn(err.Error())
+			}
+		}
+	}
+
+	csvWriter.Flush()
 
 	_ = inputFile.Close()
 	_ = outputFileCSV.Close()
@@ -159,11 +209,10 @@ type record struct {
 
 	cnameCount int
 	mxCount    int
+	txtCount   int
 
 	ptrCount int
 	ptrRatio int
-
-	registryCount int
 
 	asnCount         int
 	regionCount      int
@@ -171,7 +220,7 @@ type record struct {
 }
 
 func csvHeader() []string {
-	return []string{"domain", "tld", "a_count", "mx_count", "cname_count", "ptr_count", "ptr_ratio", "registry_count", "asn_count", "region_count", "allocation_duration_months"}
+	return []string{"domain", "tld", "a_count", "mx_count", "cname_count", "txt_count", "ptr_count", "ptr_ratio", "asn_count", "region_count", "allocation_duration_months", "is_legit"}
 }
 
 func (r record) toCSV() []string {
@@ -181,12 +230,13 @@ func (r record) toCSV() []string {
 		strconv.Itoa(len(r.ips)),
 		strconv.Itoa(r.mxCount),
 		strconv.Itoa(r.cnameCount),
+		strconv.Itoa(r.txtCount),
 		strconv.Itoa(r.ptrCount),
 		strconv.Itoa(r.ptrRatio),
-		strconv.Itoa(r.registryCount),
 		strconv.Itoa(r.asnCount),
 		strconv.Itoa(r.regionCount),
 		strconv.Itoa(r.allocationMonths),
+		"1",
 	}
 }
 
@@ -216,6 +266,117 @@ func prepareResolver(dnsServer string) *net.Resolver {
 	}
 
 	return r
+}
+
+func queryRecords(records []record) ([]record, error) {
+	var ipMap = make(map[string][3]string) // map[ip][[ASNs], [countries], [allocationDuration]]
+	var domainMap = make(map[string]*domainParcel)
+
+	var ips = make([]net.IP, 0)
+
+	for _, r := range records {
+		for _, ip := range r.ips {
+			ips = append(ips, ip)
+		}
+
+		domainMap[r.name] = &domainParcel{
+			record:      r,
+			asns:        []string{},
+			countries:   []string{},
+			allocatedAt: time.Now(),
+			ips:         r.ips,
+		}
+	}
+
+	retiesLeft := 3
+	var response []ipisp.Response
+	var err error
+
+	for retiesLeft > 0 {
+		response, err = whoIsClient.LookupIPs(ips)
+		if err == nil {
+			break
+		}
+
+		retiesLeft--
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, res := range response {
+		//ip_ := res.IP.String()
+
+		ipMap[res.IP.String()] = [3]string{
+			fmt.Sprintf("%d", res.ASN),
+			res.Country,
+			fmt.Sprintf("%d", res.AllocatedAt.Unix()),
+		}
+
+		//v, ok := ipMap[ip_]
+		//if ok {
+		//	v[0] = append(v[0], fmt.Sprintf("%d", res.ASN))
+		//	v[1] = append(v[1], res.Country)
+		//	v[2] = append(v[2], fmt.Sprintf("%d", res.AllocatedAt.Unix()))
+		//
+		//	ipMap[ip_] = v
+		//} else {
+		//	ipMap[ip_] = [3][]string{
+		//		{fmt.Sprintf("%d", res.ASN)},
+		//		{res.Country},
+		//		{fmt.Sprintf("%d", res.AllocatedAt.Unix())},
+		//	}
+		//}
+	}
+
+	for _, r := range domainMap {
+		for _, ip := range r.ips {
+
+			v, ok := ipMap[ip.String()]
+			if ok {
+				r.asns = append(r.asns, v[0])
+				r.countries = append(r.countries, v[1])
+
+				timestamp, _ := strconv.Atoi(v[2])
+
+				t := time.Unix(int64(timestamp), 0)
+
+				if r.allocatedAt.After(t) {
+					r.allocatedAt = t
+				}
+			}
+
+		}
+	}
+
+	var result = make([]record, 0)
+
+	for _, r := range records {
+		v, ok := domainMap[r.name]
+		if ok {
+			slices.Sort(v.countries)
+			v.countries = slices.Compact[[]string, string](v.countries)
+
+			slices.Sort(v.asns)
+			v.asns = slices.Compact[[]string, string](v.asns)
+
+			r.asnCount = len(v.asns)
+			r.regionCount = len(v.countries)
+
+			result = append(result, r)
+		}
+	}
+
+	return result, err
+}
+
+type domainParcel struct {
+	record      record
+	asns        []string
+	countries   []string
+	allocatedAt time.Time
+	ips         []net.IP
 }
 
 func queryWhoIS(ips []net.IP) (asns, countries, allocMonths, registries int, err error) {
@@ -263,4 +424,41 @@ func queryDNS(domain string) (string, error) {
 	}
 
 	return msg.String(), nil
+}
+
+var whoisClient *whois.Client
+
+func prepareWhoisClient() {
+	var err error
+	whoisClient, err = whois.NewClient()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func queryWhoISDomain(domain string) {
+	ctx := context.Background()
+
+	whoisDomain, err := whoisClient.Query(ctx, domain)
+	if err == nil {
+		slog.Info("queried whois from: " + whoisDomain.WhoisServer)
+
+		fmt.Println("rawtext:", whoisDomain.RawText)
+		fmt.Printf("parsed whois: %+v\n", whoisDomain.ParsedWhois)
+
+		if whoisDomain.IsAvailable != nil {
+			fmt.Println("available:", *whoisDomain.IsAvailable)
+		}
+	}
+}
+
+func queryWhoISIP(ip string) {
+	ctx := context.Background()
+
+	whoisIP, err := whoisClient.QueryIP(ctx, ip)
+	if err == nil {
+		slog.Info("queried whois from: " + whoisIP.WhoisServer)
+
+		fmt.Printf("parsed whois: %+v\n", whoisIP.ParsedWhois)
+	}
 }

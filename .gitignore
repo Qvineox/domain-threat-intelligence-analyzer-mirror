@@ -1,2 +1,5 @@
 /jupyter/datasets/
+/data
 .idea
+go.sum
+/scripts/dnsScrapper/input/

@@ -14,5 +14,5 @@ func levelsMAD(parts []string) (float64, error) {
 
 	slices.Sort(lengths)
 
-	return stats.MedianAbsoluteDeviationPopulation(lengths)
+	return stats.MedianAbsoluteDeviation(lengths)
 }

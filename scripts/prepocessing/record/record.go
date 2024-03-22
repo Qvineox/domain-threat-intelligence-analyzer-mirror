@@ -29,6 +29,10 @@ type DomainRecord struct {
 
 	MaxRepeatedSymbols int `json:"max_repeated_symbols"`
 
+	Lookups LookupsData `json:"lookups"`
+
+	ICMPResponse bool `json:"icmp_response"`
+
 	IsLegit bool `json:"is_legit"`
 }
 
@@ -61,7 +65,28 @@ func NewDomainRecord(record string) (r DomainRecord, err error) {
 }
 
 func CSVHeader() []string {
-	return []string{"domain", "tld", "levels_count", "levels_mad", "symbols_count", "vowels_ratio", "consonants_ratio", "numbers_ratio", "points_ratio", "special_ratio", "unique_ratio", "max_repeated", "is_legit"}
+	return []string{
+		"domain",
+		"tld",
+		"levels_count",
+		"levels_mad",
+		"symbols_count",
+		"vowels_ratio",
+		"consonants_ratio",
+		"numbers_ratio",
+		"points_ratio",
+		"special_ratio",
+		"unique_ratio",
+		"max_repeated",
+		"a_records",
+		"mx_records",
+		"cname_records",
+		"txt_records",
+		"ptr_records",
+		"ptr_ratio",
+		//"icmp_response",
+		"is_legit",
+	}
 }
 
 func (r DomainRecord) ToCSV() []string {
@@ -69,6 +94,11 @@ func (r DomainRecord) ToCSV() []string {
 	if r.IsLegit {
 		isLegit = "1"
 	}
+
+	//var icmp = "0"
+	//if r.ICMPResponse {
+	//	icmp = "1"
+	//}
 
 	return []string{
 		r.FullName,
@@ -83,6 +113,13 @@ func (r DomainRecord) ToCSV() []string {
 		strconv.FormatFloat(r.SpecialRatio, 'f', 4, 32),
 		strconv.FormatFloat(r.UniqueRatio, 'f', 4, 32),
 		strconv.Itoa(r.MaxRepeatedSymbols),
+		strconv.Itoa(len(r.Lookups.IPs)),
+		strconv.Itoa(r.Lookups.MXs),
+		strconv.Itoa(r.Lookups.CNAMEs),
+		strconv.Itoa(r.Lookups.TXTs),
+		strconv.Itoa(r.Lookups.PTRs),
+		strconv.FormatFloat(r.Lookups.PTRRatio, 'f', 4, 32),
+		//icmp,
 		isLegit,
 	}
 }

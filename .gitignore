@@ -4,3 +4,5 @@
 go.sum
 input/
 output/
+/jupyter/.ipynb_checkpoints
+*.psd

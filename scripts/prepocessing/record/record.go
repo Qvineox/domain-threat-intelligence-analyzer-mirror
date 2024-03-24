@@ -89,6 +89,33 @@ func CSVHeader() []string {
 	}
 }
 
+//func NewRecordFromCSV(line []string) DomainRecord {
+//	return DomainRecord{
+//		FullName:           line[0],
+//		TLD:                line[1],
+//		LevelsCount:        strconv.Atoi(line[2]),
+//		LevelsMAD:          line[3],
+//		SymbolsCount:       line[4],
+//		VowelsRatio:        line[5],
+//		ConsonantsRatio:    line[6],
+//		NumbersRatio:       line[7],
+//		PointsRatio:        line[8],
+//		SpecialRatio:       line[9],
+//		UniqueRatio:        line[10],
+//		MaxRepeatedSymbols: line[11],
+//		Lookups: LookupsData{
+//			IPs:      line[12],
+//			MXs:      line[13],
+//			CNAMEs:   line[14],
+//			TXTs:     line[15],
+//			PTRs:     line[16],
+//			PTRRatio: line[17],
+//		},
+//		ICMPResponse: false,
+//		IsLegit:      line[18],
+//	}
+//}
+
 func (r DomainRecord) ToCSV() []string {
 	var isLegit = "0"
 	if r.IsLegit {

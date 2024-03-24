@@ -6,3 +6,5 @@ input/
 output/
 /jupyter/.ipynb_checkpoints
 *.psd
+/jupyter/mlruns/
+/jupyter/logs.log

@@ -10,3 +10,5 @@ docker run --gpus all -d -it -p 8848:8888 -v $(pwd)/jupyter:/home/jovyan/work -e
 - https://cert.pl/en/posts/2020/03/malicious_domains/
 - https://github.com/stamparm/blackbook
 - https://github.com/sefinek24/Sefinek-Blocklist-Collection
+
+Наборы данных также размещены по [ссылке](https://cloud.qvineox.ru/s/ykitYxMsstRcnDg)

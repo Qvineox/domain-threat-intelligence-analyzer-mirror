@@ -53,7 +53,9 @@ func main() {
 	//filterMergedOnlyWithARecords()
 	//filterMergedOnlyWithMXRecords()
 
-	populateWithWhoisData()
+	//populateWithWhoisData()
+
+	processDomCopCSV()
 
 	//data, err := domainAnalysis.QueryWhois("qvineox.ru")
 	//if err != nil {
@@ -381,6 +383,74 @@ func processRGSTXT() {
 
 		csvWriter.Flush()
 		time.Sleep(300 * time.Millisecond)
+	}
+}
+
+func processDomCopCSV() {
+	inputFile, err := os.Open("../../data/domcop/top10milliondomains.csv")
+	if err != nil {
+		slog.Error(err.Error())
+		panic(err)
+	}
+
+	var now = time.Now()
+
+	dir := fmt.Sprintf("output/%s", now.Format("01/02"))
+	err = os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		slog.Error(err.Error())
+		panic(err)
+	}
+
+	outputFile, err := os.Create(fmt.Sprintf("%s/%d_domcop.csv", dir, now.Unix()))
+	if err != nil {
+		slog.Error(err.Error())
+		panic(err)
+	}
+
+	csvWriter := csv.NewWriter(outputFile)
+	err = csvWriter.Write(record.CSVHeader())
+	if err != nil {
+		slog.Error(err.Error())
+		return
+	}
+
+	csvReader := csv.NewReader(inputFile)
+
+	_, _ = csvReader.Read() // skip header
+
+	var maxIndex = 160000
+	var index = 0
+
+	for index < maxIndex {
+		line, err := csvReader.Read()
+		if err != nil {
+			slog.Error(err.Error())
+			break
+		}
+
+		index++
+		name := line[1]
+
+		rec, err := record.NewDomainRecord(name)
+		if err != nil {
+			slog.Warn(err.Error())
+			continue
+		}
+
+		rec.IsLegit = true
+
+		rec.Lookups, err = record.LookupRecords(rec.FullName)
+		if err != nil {
+			slog.Warn("failed to lookup: " + err.Error())
+		}
+
+		err = csvWriter.Write(rec.ToCSV())
+		if err != nil {
+			slog.Error(err.Error())
+		}
+
+		csvWriter.Flush()
 	}
 }
 

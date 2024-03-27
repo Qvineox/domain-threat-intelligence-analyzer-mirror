@@ -9,3 +9,4 @@ output/
 /jupyter/mlruns/
 /jupyter/logs.log
 /jupyter/notebooks/.ipynb_checkpoints/dga-checkpoint.ipynb
+/scripts/ensembled/models/

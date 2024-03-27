@@ -419,8 +419,14 @@ func processDomCopCSV() {
 
 	_, _ = csvReader.Read() // skip header
 
-	var maxIndex = 160000
 	var index = 0
+	var startingIndex = 23579
+	var maxIndex = 160000
+
+	for index < startingIndex {
+		_, _ = csvReader.Read()
+		index++
+	}
 
 	for index < maxIndex {
 		line, err := csvReader.Read()

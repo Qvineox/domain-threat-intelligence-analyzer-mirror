@@ -4,7 +4,8 @@
 go.sum
 input/
 output/
-/jupyter/.ipynb_checkpoints
-*.psd
+.ipynb_checkpoints
+*.log
 /jupyter/mlruns/
 /jupyter/logs.log
+/jupyter/notebooks/.ipynb_checkpoints/dga-checkpoint.ipynb

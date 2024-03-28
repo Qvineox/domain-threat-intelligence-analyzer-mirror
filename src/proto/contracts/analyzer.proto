@@ -1,0 +1,53 @@
+syntax = "proto3";
+package services;
+
+// python -m grpc_tools.protoc -I. --python_out=../services --pyi_out=../services --grpc_python_out=../services analyzer.proto
+
+//import "google/protobuf/timestamp.proto";
+
+service DomainAnalysisService {
+  rpc GetFullScoring(FullDomainScoringParams) returns (DomainScoring);
+}
+
+message FullDomainScoringParams {
+  repeated SemanticData semantics = 1;
+  repeated ResourceRecodsData resources = 2;
+}
+
+message DomainScoring {
+  float finalScore = 1;
+  float semanticScore = 2;
+  float resourceScore = 3;
+  float dgaScore = 4;
+
+  ScoreFlag tag = 5;
+}
+
+enum ScoreFlag {
+  DOMAIN_SCORE_BENIGN = 0;
+  DOMAIN_SCORE_DUBIOUS = 1;
+  DOMAIN_SCORE_SUSPICIOUS = 2;
+  DOMAIN_SCORE_MALICIOUS = 3;
+}
+
+message SemanticData {
+  optional float levelsCount = 1;
+  optional float levelsMAD = 2;
+  optional float symbolsCount = 3;
+  optional float vowelsRatio = 4;
+  optional float consonantsRatio = 5;
+  optional float numbersRatio = 6;
+  optional float pointsRatio = 7;
+  optional float specialRatio = 8;
+  optional float uniqueRatio = 9;
+  optional float maxRepeated = 10;
+}
+
+message ResourceRecodsData {
+  float aRecords = 1;
+  float mxRecords = 2;
+  float cnameRecords = 3;
+  float txtRecords = 4;
+  float ptrRecords = 5;
+  float ptrRatio = 6;
+}

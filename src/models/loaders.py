@@ -1,5 +1,6 @@
 from pycaret.regression import load_model as pycaret_load
-from keras.saving import load_model as keras_load
+import keras
+
 
 def load_semantic_regression_model():
     return pycaret_load('models/pkl/semantic_regression_lgbm')
@@ -10,4 +11,4 @@ def load_resource_records_regression_model():
 
 
 def load_keras_lstm_model():
-    return keras_load("models/keras/dga_lstm.keras")
+    return keras.models.load_model("models/keras/dga_lstm.h5")

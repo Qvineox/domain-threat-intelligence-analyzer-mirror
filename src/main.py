@@ -37,6 +37,7 @@ def serve():
 
     # print(scoring_server.semantic_score_calculation('test'))
     # print(scoring_server.resource_records_score_calculation('test'))
+    # print(scoring_server.dga_score_calculation('cvyh1po636avyrsxebwbkn7.ddns.net'))
 
     analyzer_pb2_grpc.add_DomainAnalysisServiceServicer_to_server(scoring_server, server)
 

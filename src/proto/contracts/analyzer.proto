@@ -11,7 +11,8 @@ service DomainAnalysisService {
 
 message FullDomainScoringParams {
   repeated SemanticData semantics = 1;
-  repeated ResourceRecodsData resources = 2;
+  repeated ResourceRecordsData resources = 2;
+  repeated string names = 3;
 }
 
 message DomainScoring {
@@ -43,7 +44,7 @@ message SemanticData {
   optional float maxRepeated = 10;
 }
 
-message ResourceRecodsData {
+message ResourceRecordsData {
   float aRecords = 1;
   float mxRecords = 2;
   float cnameRecords = 3;

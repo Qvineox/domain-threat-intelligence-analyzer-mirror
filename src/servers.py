@@ -1,3 +1,4 @@
+from src.models.tokenizer import tokenize_domain
 from src.proto.services import analyzer_pb2, analyzer_pb2_grpc
 
 import pandas as pd
@@ -10,12 +11,12 @@ class DomainScoringServerImpl(analyzer_pb2_grpc.DomainAnalysisServiceServicer):
         self.dga_model = dga_model
 
     def GetFullScoring(self, request, context):
-        print(request.semantics)
-
-        return analyzer_pb2.DomainScoring(finalScore=0,
-                                          semanticScore=self.semantic_score_calculation(request.semantics[0]),
-                                          resourceScore=self.resource_records_score_calculation(request.resources[0]),
-                                          dgaScore=0,
+        return analyzer_pb2.DomainScoring(finalScore=0.5,
+                                          # semanticScores=self.semantic_score_calculation(request.semantics[0]),
+                                          # resourceScores=self.resource_records_score_calculation(request.resources[0]),
+                                          semanticScore=1.0,
+                                          resourceScore=0.0,
+                                          dgaScore=self.dga_score_calculation(request.names[0]),
                                           tag=analyzer_pb2.DOMAIN_SCORE_BENIGN)
 
     def semantic_score_calculation(self, params):
@@ -41,3 +42,6 @@ class DomainScoringServerImpl(analyzer_pb2_grpc.DomainAnalysisServiceServicer):
                            "ptr_ratio": [params.ptrRatio]})
 
         return self.resource_model.predict(df)[0]
+
+    def dga_score_calculation(self, name):
+        return round(self.dga_model.predict(tokenize_domain(name)).tolist()[0][0], 4)
